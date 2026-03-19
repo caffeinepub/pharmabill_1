@@ -15,6 +15,16 @@ export const Customer = IDL.Record({
   'address' : IDL.Text,
   'phone' : IDL.Text,
 });
+export const Distributor = IDL.Record({
+  'id' : IDL.Nat,
+  'drugLicenseNumber' : IDL.Text,
+  'gstNumber' : IDL.Text,
+  'name' : IDL.Text,
+  'contactPerson' : IDL.Text,
+  'email' : IDL.Text,
+  'address' : IDL.Text,
+  'phone' : IDL.Text,
+});
 export const Unit = IDL.Variant({
   'bottle' : IDL.Null,
   'tablet' : IDL.Null,
@@ -36,12 +46,36 @@ export const Medicine = IDL.Record({
   'reorderLevel' : IDL.Nat,
   'currentStock' : IDL.Nat,
 });
+export const Time = IDL.Int;
+export const PurchaseItem = IDL.Record({
+  'mrp' : IDL.Nat,
+  'qty' : IDL.Nat,
+  'purchaseRate' : IDL.Nat,
+  'gstPercent' : IDL.Nat,
+  'freeQty' : IDL.Nat,
+  'batch' : IDL.Text,
+  'expiry' : IDL.Text,
+  'medicineId' : IDL.Nat,
+  'amount' : IDL.Nat,
+  'medicineName' : IDL.Text,
+});
+export const Purchase = IDL.Record({
+  'id' : IDL.Nat,
+  'purchaseDate' : Time,
+  'distributorName' : IDL.Text,
+  'distributorId' : IDL.Nat,
+  'totalGST' : IDL.Nat,
+  'grandTotal' : IDL.Nat,
+  'invoiceDate' : IDL.Text,
+  'invoiceNumber' : IDL.Text,
+  'items' : IDL.Vec(PurchaseItem),
+  'subtotal' : IDL.Nat,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const Time = IDL.Int;
 export const PaymentMode = IDL.Variant({
   'UPI' : IDL.Null,
   'card' : IDL.Null,
@@ -77,20 +111,33 @@ export const DashboardStats = IDL.Record({
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addCustomer' : IDL.Func([Customer], [IDL.Nat], []),
+  'addDistributor' : IDL.Func([Distributor], [IDL.Nat], []),
   'addMedicine' : IDL.Func([Medicine], [IDL.Nat], []),
+  'addPurchase' : IDL.Func([Purchase], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'assignRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createBill' : IDL.Func([Bill], [IDL.Nat], []),
   'deleteCustomer' : IDL.Func([IDL.Nat], [], []),
+  'deleteDistributor' : IDL.Func([IDL.Nat], [], []),
   'deleteMedicine' : IDL.Func([IDL.Nat], [], []),
   'getAllBills' : IDL.Func([], [IDL.Vec(Bill)], ['query']),
   'getAllCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
+  'getAllDistributors' : IDL.Func([], [IDL.Vec(Distributor)], ['query']),
   'getAllMedicines' : IDL.Func([], [IDL.Vec(Medicine)], ['query']),
+  'getAllPurchases' : IDL.Func([], [IDL.Vec(Purchase)], ['query']),
   'getBill' : IDL.Func([IDL.Nat], [Bill], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCustomer' : IDL.Func([IDL.Nat], [Customer], ['query']),
   'getDashboardStats' : IDL.Func([], [DashboardStats], ['query']),
+  'getDistributor' : IDL.Func([IDL.Nat], [Distributor], ['query']),
   'getMedicine' : IDL.Func([IDL.Nat], [Medicine], ['query']),
+  'getPurchase' : IDL.Func([IDL.Nat], [Purchase], ['query']),
+  'getPurchasesByDistributor' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(Purchase)],
+      ['query'],
+    ),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -100,6 +147,7 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'updateCustomer' : IDL.Func([Customer], [], []),
+  'updateDistributor' : IDL.Func([Distributor], [], []),
   'updateMedicine' : IDL.Func([Medicine], [], []),
 });
 
@@ -109,6 +157,16 @@ export const idlFactory = ({ IDL }) => {
   const Customer = IDL.Record({
     'id' : IDL.Nat,
     'name' : IDL.Text,
+    'email' : IDL.Text,
+    'address' : IDL.Text,
+    'phone' : IDL.Text,
+  });
+  const Distributor = IDL.Record({
+    'id' : IDL.Nat,
+    'drugLicenseNumber' : IDL.Text,
+    'gstNumber' : IDL.Text,
+    'name' : IDL.Text,
+    'contactPerson' : IDL.Text,
     'email' : IDL.Text,
     'address' : IDL.Text,
     'phone' : IDL.Text,
@@ -134,12 +192,36 @@ export const idlFactory = ({ IDL }) => {
     'reorderLevel' : IDL.Nat,
     'currentStock' : IDL.Nat,
   });
+  const Time = IDL.Int;
+  const PurchaseItem = IDL.Record({
+    'mrp' : IDL.Nat,
+    'qty' : IDL.Nat,
+    'purchaseRate' : IDL.Nat,
+    'gstPercent' : IDL.Nat,
+    'freeQty' : IDL.Nat,
+    'batch' : IDL.Text,
+    'expiry' : IDL.Text,
+    'medicineId' : IDL.Nat,
+    'amount' : IDL.Nat,
+    'medicineName' : IDL.Text,
+  });
+  const Purchase = IDL.Record({
+    'id' : IDL.Nat,
+    'purchaseDate' : Time,
+    'distributorName' : IDL.Text,
+    'distributorId' : IDL.Nat,
+    'totalGST' : IDL.Nat,
+    'grandTotal' : IDL.Nat,
+    'invoiceDate' : IDL.Text,
+    'invoiceNumber' : IDL.Text,
+    'items' : IDL.Vec(PurchaseItem),
+    'subtotal' : IDL.Nat,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const Time = IDL.Int;
   const PaymentMode = IDL.Variant({
     'UPI' : IDL.Null,
     'card' : IDL.Null,
@@ -175,20 +257,33 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addCustomer' : IDL.Func([Customer], [IDL.Nat], []),
+    'addDistributor' : IDL.Func([Distributor], [IDL.Nat], []),
     'addMedicine' : IDL.Func([Medicine], [IDL.Nat], []),
+    'addPurchase' : IDL.Func([Purchase], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'assignRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createBill' : IDL.Func([Bill], [IDL.Nat], []),
     'deleteCustomer' : IDL.Func([IDL.Nat], [], []),
+    'deleteDistributor' : IDL.Func([IDL.Nat], [], []),
     'deleteMedicine' : IDL.Func([IDL.Nat], [], []),
     'getAllBills' : IDL.Func([], [IDL.Vec(Bill)], ['query']),
     'getAllCustomers' : IDL.Func([], [IDL.Vec(Customer)], ['query']),
+    'getAllDistributors' : IDL.Func([], [IDL.Vec(Distributor)], ['query']),
     'getAllMedicines' : IDL.Func([], [IDL.Vec(Medicine)], ['query']),
+    'getAllPurchases' : IDL.Func([], [IDL.Vec(Purchase)], ['query']),
     'getBill' : IDL.Func([IDL.Nat], [Bill], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCustomer' : IDL.Func([IDL.Nat], [Customer], ['query']),
     'getDashboardStats' : IDL.Func([], [DashboardStats], ['query']),
+    'getDistributor' : IDL.Func([IDL.Nat], [Distributor], ['query']),
     'getMedicine' : IDL.Func([IDL.Nat], [Medicine], ['query']),
+    'getPurchase' : IDL.Func([IDL.Nat], [Purchase], ['query']),
+    'getPurchasesByDistributor' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(Purchase)],
+        ['query'],
+      ),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -198,6 +293,7 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'updateCustomer' : IDL.Func([Customer], [], []),
+    'updateDistributor' : IDL.Func([Distributor], [], []),
     'updateMedicine' : IDL.Func([Medicine], [], []),
   });
 };

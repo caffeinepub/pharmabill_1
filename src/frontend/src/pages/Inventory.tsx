@@ -36,8 +36,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit2, Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { INDIAN_MEDICINES } from "../data/indianMedicines";
 import {
   type Medicine,
   Unit,
@@ -58,9 +59,9 @@ const EMPTY_MED: Medicine = {
   reorderLevel: 10n,
   sellingPrice: 0n,
   purchasePrice: 0n,
-  gstPercent: 12n,
+  gstPercent: 5n,
   unit: Unit.strip,
-  hsnCode: "",
+  hsnCode: "3004",
   rackLocation: "",
 };
 
@@ -98,6 +99,14 @@ function StockBadge({ med }: { med: Medicine }) {
       }}
     >
       In Stock
+    </span>
+  );
+}
+
+function CatalogBadge() {
+  return (
+    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+      Catalog
     </span>
   );
 }
@@ -261,7 +270,38 @@ export default function Inventory() {
   const [form, setForm] = useState<Medicine>(EMPTY_MED);
   const [deleteTarget, setDeleteTarget] = useState<bigint | null>(null);
 
-  const filtered = medicines.filter(
+  // Merge backend medicines with catalog (catalog-only = not yet saved to backend)
+  const { allMedicines, catalogOnlyNames } = useMemo(() => {
+    const backendNames = new Set(medicines.map((m) => m.name.toLowerCase()));
+    const catalogOnly = INDIAN_MEDICINES.filter(
+      (m) => !backendNames.has(m.name.toLowerCase()),
+    ).map(
+      (m) =>
+        ({
+          id: -1n,
+          name: m.name,
+          genericName: m.genericName,
+          manufacturer: m.manufacturer,
+          batchNumber: "",
+          expiryDate: "",
+          currentStock: 0n,
+          reorderLevel: 10n,
+          sellingPrice: 0n,
+          purchasePrice: 0n,
+          gstPercent: BigInt(m.gstPercent),
+          unit: m.unit === "bottle" ? Unit.bottle : Unit.strip,
+          hsnCode: m.hsnCode,
+          rackLocation: "",
+        }) as Medicine,
+    );
+    const names = new Set(catalogOnly.map((m) => m.name.toLowerCase()));
+    return {
+      allMedicines: [...medicines, ...catalogOnly],
+      catalogOnlyNames: names,
+    };
+  }, [medicines]);
+
+  const filtered = allMedicines.filter(
     (m) =>
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.genericName.toLowerCase().includes(search.toLowerCase()),
@@ -275,6 +315,11 @@ export default function Inventory() {
   const openEdit = (m: Medicine) => {
     setEditing(m);
     setForm({ ...m });
+    setModalOpen(true);
+  };
+  const openFromCatalog = (m: Medicine) => {
+    setEditing(null);
+    setForm({ ...m, id: 0n });
     setModalOpen(true);
   };
 
@@ -313,16 +358,18 @@ export default function Inventory() {
         <div>
           <h1 className="text-2xl font-bold">Inventory</h1>
           <p className="text-muted-foreground text-xs mt-0.5">
-            {medicines.length} medicines registered
+            {medicines.length} saved · {allMedicines.length} total in catalog
           </p>
         </div>
-        <Button
-          onClick={openAdd}
-          className="h-8 text-xs gap-1.5"
-          data-ocid="inventory.add.button"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add Medicine
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={openAdd}
+            className="h-8 text-xs gap-1.5"
+            data-ocid="inventory.add.button"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Medicine
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-card">
@@ -389,63 +436,87 @@ export default function Inventory() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((med, idx) => (
-                    <TableRow
-                      key={String(med.id)}
-                      className="border-border text-[13px]"
-                      data-ocid={`inventory.item.${idx + 1}`}
-                    >
-                      <TableCell className="pl-5 font-medium">
-                        {med.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {med.genericName || "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {med.batchNumber || "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {med.expiryDate || "—"}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {String(med.currentStock)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {String(med.reorderLevel)}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {String(med.sellingPrice)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {String(med.gstPercent)}%
-                      </TableCell>
-                      <TableCell>
-                        <StockBadge med={med} />
-                      </TableCell>
-                      <TableCell className="pr-5">
-                        <div className="flex items-center gap-1 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => openEdit(med)}
-                            data-ocid={`inventory.edit_button.${idx + 1}`}
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(med.id)}
-                            data-ocid={`inventory.delete_button.${idx + 1}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filtered.map((med, idx) => {
+                    const isCatalog = catalogOnlyNames.has(
+                      med.name.toLowerCase(),
+                    );
+                    return (
+                      <TableRow
+                        key={isCatalog ? `cat-${med.name}` : String(med.id)}
+                        className="border-border text-[13px]"
+                        data-ocid={`inventory.item.${idx + 1}`}
+                      >
+                        <TableCell className="pl-5 font-medium">
+                          {med.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {med.genericName || "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {med.batchNumber || "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {med.expiryDate || "—"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {isCatalog ? "—" : String(med.currentStock)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {isCatalog ? "—" : String(med.reorderLevel)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {isCatalog ? "—" : String(med.sellingPrice)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {String(med.gstPercent)}%
+                        </TableCell>
+                        <TableCell>
+                          {isCatalog ? (
+                            <CatalogBadge />
+                          ) : (
+                            <StockBadge med={med} />
+                          )}
+                        </TableCell>
+                        <TableCell className="pr-5">
+                          <div className="flex items-center gap-1 justify-end">
+                            {isCatalog ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary"
+                                onClick={() => openFromCatalog(med)}
+                                data-ocid={`inventory.add.button.${idx + 1}`}
+                                title="Add to inventory"
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => openEdit(med)}
+                                  data-ocid={`inventory.edit_button.${idx + 1}`}
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteTarget(med.id)}
+                                  data-ocid={`inventory.delete_button.${idx + 1}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

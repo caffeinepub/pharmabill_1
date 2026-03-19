@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { INDIAN_MEDICINES } from "../data/indianMedicines";
 import {
   type Medicine,
   PaymentMode,
@@ -58,6 +59,7 @@ interface BillRow {
   unitPrice: number;
   gstPct: number;
   rowKey: string;
+  isNewMedicine?: boolean;
 }
 
 function calcRow(row: BillRow) {
@@ -79,6 +81,7 @@ function newRow(): BillRow {
     unitPrice: 0,
     gstPct: 12,
     rowKey: String(rowCounter),
+    isNewMedicine: false,
   };
 }
 
@@ -108,6 +111,14 @@ const defaultMedForm = (): NewMedForm => ({
   currentStock: "",
 });
 
+function todayStr() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 export default function NewBill() {
   const { data: customers = [] } = useGetCustomers();
   const { data: medicines = [] } = useGetMedicines();
@@ -121,11 +132,21 @@ export default function NewBill() {
     return Math.max(...allBills.map((b) => Number(b.billNumber))) + 1;
   }, [allBills]);
 
+  const defaultBillNoStr = useMemo(
+    () => `INV-${String(nextBillNo).padStart(4, "0")}`,
+    [nextBillNo],
+  );
+
+  // Editable bill header fields
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(todayStr());
+
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
   const [doctorName, setDoctorName] = useState("");
+  const [doctorRegNo, setDoctorRegNo] = useState("");
   const [rows, setRows] = useState<BillRow[]>([]);
   const [payment, setPayment] = useState<PaymentMode>(PaymentMode.cash);
   const [medSearch, setMedSearch] = useState("");
@@ -146,23 +167,51 @@ export default function NewBill() {
   const [isSavingMed, setIsSavingMed] = useState(false);
 
   // Save customer prompt state
-  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [saveCustomerPromptOpen, setSaveCustomerPromptOpen] = useState(false);
+  // Save medicine prompt state
+  const [saveMedPromptOpen, setSaveMedPromptOpen] = useState(false);
   const [isSavingBill, setIsSavingBill] = useState(false);
 
-  // Capture current rows/payment at prompt time so values don't drift
   const pendingRowsRef = useRef<BillRow[]>([]);
   const pendingPaymentRef = useRef<PaymentMode>(PaymentMode.cash);
 
-  const today = new Date().toLocaleDateString("en-IN");
-  const billNoStr = `INV-${String(nextBillNo).padStart(4, "0")}`;
+  const effectiveInvoiceNo = invoiceNo.trim() || defaultBillNoStr;
 
-  const filteredMeds = useMemo(
-    () =>
-      medicines
-        .filter((m) => m.name.toLowerCase().includes(medSearch.toLowerCase()))
-        .slice(0, 8),
-    [medicines, medSearch],
-  );
+  const filteredMeds = useMemo(() => {
+    const lower = medSearch.toLowerCase();
+    const backendNames = new Set(medicines.map((m) => m.name.toLowerCase()));
+    const backendMatches = medicines
+      .filter((m) => m.name.toLowerCase().includes(lower))
+      .slice(0, 8);
+    if (backendMatches.length >= 8 || !lower) return backendMatches;
+    // Fill remaining slots from catalog
+    const catalogMatches = INDIAN_MEDICINES.filter(
+      (m) =>
+        m.name.toLowerCase().includes(lower) &&
+        !backendNames.has(m.name.toLowerCase()),
+    )
+      .slice(0, 8 - backendMatches.length)
+      .map(
+        (m) =>
+          ({
+            id: -1n,
+            name: m.name,
+            genericName: m.genericName,
+            manufacturer: m.manufacturer,
+            batchNumber: "",
+            expiryDate: "",
+            currentStock: 0n,
+            reorderLevel: 10n,
+            sellingPrice: 0n,
+            purchasePrice: 0n,
+            gstPercent: BigInt(m.gstPercent),
+            unit: m.unit === "bottle" ? Unit.bottle : Unit.strip,
+            hsnCode: m.hsnCode,
+            rackLocation: "",
+          }) as Medicine,
+      );
+    return [...backendMatches, ...catalogMatches];
+  }, [medicines, medSearch]);
   const filteredCustomers = useMemo(
     () =>
       customers
@@ -181,14 +230,26 @@ export default function NewBill() {
       r.map((row) => (row.rowKey === key ? { ...row, ...patch } : row)),
     );
 
-  const selectMedicine = (key: string, med: Medicine) => {
+  const selectMedicine = async (key: string, med: Medicine) => {
+    let resolvedId = med.id;
+    // Catalog-only medicine (not yet saved to backend) — auto-save it
+    if (med.id === -1n) {
+      try {
+        const newId = await addMedicine.mutateAsync({ ...med, id: 0n });
+        resolvedId = newId ?? 0n;
+      } catch {
+        // Save failed — use 0n so validation prompts the user
+        resolvedId = 0n;
+      }
+    }
     updateRow(key, {
-      medicineId: med.id,
+      medicineId: resolvedId,
       medicineName: med.name,
       batch: med.batchNumber,
       expiry: med.expiryDate,
       unitPrice: Number(med.sellingPrice),
       gstPct: Number(med.gstPercent),
+      isNewMedicine: false,
     });
     setMedDropOpen(null);
     setMedSearch("");
@@ -230,14 +291,22 @@ export default function NewBill() {
         rackLocation: "",
       };
       const newId = await addMedicine.mutateAsync(medPayload);
-      const createdMed: Medicine = { ...medPayload, id: newId };
+      const createdMed: Medicine = { ...medPayload, id: newId ?? 0n };
       if (newMedRowKey) {
-        selectMedicine(newMedRowKey, createdMed);
+        updateRow(newMedRowKey, {
+          medicineId: createdMed.id,
+          medicineName: createdMed.name,
+          batch: createdMed.batchNumber,
+          expiry: createdMed.expiryDate,
+          unitPrice: Number(createdMed.sellingPrice),
+          gstPct: Number(createdMed.gstPercent),
+          isNewMedicine: false,
+        });
       }
       setNewMedOpen(false);
       toast.success(`${newMedForm.name.trim()} added to inventory`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to add medicine");
+    } catch {
+      toast.error("Failed to add medicine. Please try again.");
     } finally {
       setIsSavingMed(false);
     }
@@ -278,34 +347,31 @@ export default function NewBill() {
         email: newCustDoctor.trim(),
         address: newCustAddress.trim(),
       });
-      setCustomerId(String(newId));
+      setCustomerId(String(newId ?? 0n));
       setPatientName(newCustName.trim());
       setPatientPhone(newCustPhone.trim());
       setDoctorName(newCustDoctor.trim());
       setNewCustOpen(false);
-      toast.success("Customer added successfully");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to add customer");
+      toast.success("Customer saved successfully");
+    } catch {
+      toast.error("Failed to save customer. Please try again.");
     } finally {
       setIsSavingCust(false);
     }
   };
 
-  /** Core bill-save logic. resolvedCustomerId must already be determined. */
   const executeSave = async (
     resolvedCustomerId: bigint,
     currentRows: BillRow[],
     currentPayment: PaymentMode,
-    currentBillNo: number,
   ) => {
     const sub = currentRows.reduce((s, r) => s + calcRow(r).subtotal, 0);
     const gst = currentRows.reduce((s, r) => s + calcRow(r).gstAmt, 0);
     const grand = currentRows.reduce((s, r) => s + calcRow(r).total, 0);
-    const currentBillNoStr = `INV-${String(currentBillNo).padStart(4, "0")}`;
 
     await createBill.mutateAsync({
       id: 0n,
-      billNumber: BigInt(currentBillNo),
+      billNumber: BigInt(nextBillNo),
       billDate: BigInt(Date.now() * 1_000_000),
       customerId: resolvedCustomerId,
       paymentMode: currentPayment,
@@ -322,18 +388,20 @@ export default function NewBill() {
       })),
     });
 
-    toast.success(`Bill ${currentBillNoStr} saved successfully`);
+    toast.success(`Bill ${effectiveInvoiceNo} saved successfully`);
     setRows([]);
     setCustomerId("");
     setCustomerSearch("");
     setPatientName("");
     setPatientPhone("");
     setDoctorName("");
+    setDoctorRegNo("");
+    setInvoiceNo("");
+    setInvoiceDate(todayStr());
     setPayment(PaymentMode.cash);
   };
 
-  /** Called from the "Save & Continue" prompt button — saves customer record + bill */
-  const handlePromptSaveAndContinue = async () => {
+  const handlePromptSaveCustomer = async () => {
     setIsSavingBill(true);
     try {
       const newId = await addCustomer.mutateAsync({
@@ -341,24 +409,22 @@ export default function NewBill() {
         name: patientName.trim(),
         phone: patientPhone.trim(),
         email: doctorName.trim(),
-        address: "",
+        address: doctorRegNo.trim(),
       });
       await executeSave(
-        newId,
+        newId ?? 0n,
         pendingRowsRef.current,
         pendingPaymentRef.current,
-        nextBillNo,
       );
-      setSavePromptOpen(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Error saving bill");
+      setSaveCustomerPromptOpen(false);
+    } catch {
+      toast.error("Failed to save bill. Please try again.");
     } finally {
       setIsSavingBill(false);
     }
   };
 
-  /** Called from the "Just this bill" prompt button */
-  const handlePromptJustThisBill = async () => {
+  const handlePromptSkipCustomer = async () => {
     setIsSavingBill(true);
     try {
       const newId = await addCustomer.mutateAsync({
@@ -366,17 +432,16 @@ export default function NewBill() {
         name: patientName.trim(),
         phone: patientPhone.trim(),
         email: doctorName.trim(),
-        address: "",
+        address: doctorRegNo.trim(),
       });
       await executeSave(
-        newId,
+        newId ?? 0n,
         pendingRowsRef.current,
         pendingPaymentRef.current,
-        nextBillNo,
       );
-      setSavePromptOpen(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Error saving bill");
+      setSaveCustomerPromptOpen(false);
+    } catch {
+      toast.error("Failed to save bill. Please try again.");
     } finally {
       setIsSavingBill(false);
     }
@@ -386,25 +451,24 @@ export default function NewBill() {
     if (!patientName.trim()) return toast.error("Please enter patient name");
     if (rows.length === 0) return toast.error("Add at least one medicine");
     if (rows.some((r) => r.medicineId === 0n))
-      return toast.error("Select medicine for all rows");
+      return toast.error("Please select a medicine for all rows");
 
-    // If customer already linked (existing or saved via dialog), save directly
     if (customerId) {
       setIsSavingBill(true);
       try {
-        await executeSave(BigInt(customerId), rows, payment, nextBillNo);
-      } catch (e: any) {
-        toast.error(e?.message ?? "Error saving bill");
+        await executeSave(BigInt(customerId), rows, payment);
+      } catch {
+        toast.error("Failed to save bill. Please try again.");
       } finally {
         setIsSavingBill(false);
       }
       return;
     }
 
-    // No saved customer — show prompt
+    // New patient — ask if they want to save customer
     pendingRowsRef.current = rows;
     pendingPaymentRef.current = payment;
-    setSavePromptOpen(true);
+    setSaveCustomerPromptOpen(true);
   };
 
   const selectedCustomer = customers.find((c) => String(c.id) === customerId);
@@ -535,7 +599,6 @@ export default function NewBill() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
-            {/* Name */}
             <div className="col-span-2">
               <Label htmlFor="nm-name" className="text-sm font-medium">
                 Medicine Name <span className="text-destructive">*</span>
@@ -549,7 +612,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("name", e.target.value)}
               />
             </div>
-            {/* Generic Name */}
             <div className="col-span-2">
               <Label htmlFor="nm-generic" className="text-sm font-medium">
                 Generic Name
@@ -563,7 +625,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("genericName", e.target.value)}
               />
             </div>
-            {/* Batch */}
             <div>
               <Label htmlFor="nm-batch" className="text-sm font-medium">
                 Batch Number
@@ -577,7 +638,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("batchNumber", e.target.value)}
               />
             </div>
-            {/* Expiry */}
             <div>
               <Label htmlFor="nm-expiry" className="text-sm font-medium">
                 Expiry Date
@@ -591,7 +651,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("expiryDate", e.target.value)}
               />
             </div>
-            {/* HSN */}
             <div>
               <Label htmlFor="nm-hsn" className="text-sm font-medium">
                 HSN Code
@@ -605,7 +664,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("hsnCode", e.target.value)}
               />
             </div>
-            {/* Unit */}
             <div>
               <Label className="text-sm font-medium">Unit</Label>
               <Select
@@ -625,7 +683,6 @@ export default function NewBill() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Selling Price */}
             <div>
               <Label htmlFor="nm-sell" className="text-sm font-medium">
                 Selling Price (₹)
@@ -641,7 +698,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("sellingPrice", e.target.value)}
               />
             </div>
-            {/* Purchase Price */}
             <div>
               <Label htmlFor="nm-purchase" className="text-sm font-medium">
                 Purchase Price (₹)
@@ -657,7 +713,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("purchasePrice", e.target.value)}
               />
             </div>
-            {/* GST % */}
             <div>
               <Label htmlFor="nm-gst" className="text-sm font-medium">
                 GST %
@@ -673,7 +728,6 @@ export default function NewBill() {
                 onChange={(e) => patchMed("gstPercent", e.target.value)}
               />
             </div>
-            {/* Stock Qty */}
             <div>
               <Label htmlFor="nm-stock" className="text-sm font-medium">
                 Stock Qty
@@ -719,9 +773,9 @@ export default function NewBill() {
 
       {/* Save Customer Prompt Dialog */}
       <Dialog
-        open={savePromptOpen}
+        open={saveCustomerPromptOpen}
         onOpenChange={(o) => {
-          if (!isSavingBill) setSavePromptOpen(o);
+          if (!isSavingBill) setSaveCustomerPromptOpen(o);
         }}
       >
         <DialogContent
@@ -729,7 +783,7 @@ export default function NewBill() {
           data-ocid="billing.save_customer_prompt.dialog"
         >
           <DialogHeader>
-            <DialogTitle>Save customer details?</DialogTitle>
+            <DialogTitle>Save patient details?</DialogTitle>
             <DialogDescription className="pt-1">
               Do you want to save{" "}
               <span className="font-semibold text-foreground">
@@ -742,7 +796,7 @@ export default function NewBill() {
             <Button
               variant="outline"
               className="flex-1"
-              onClick={handlePromptJustThisBill}
+              onClick={handlePromptSkipCustomer}
               disabled={isSavingBill}
               data-ocid="billing.just_this_bill.button"
             >
@@ -754,7 +808,7 @@ export default function NewBill() {
             </Button>
             <Button
               className="flex-1"
-              onClick={handlePromptSaveAndContinue}
+              onClick={handlePromptSaveCustomer}
               disabled={isSavingBill}
               data-ocid="billing.save_and_continue.button"
             >
@@ -768,21 +822,86 @@ export default function NewBill() {
         </DialogContent>
       </Dialog>
 
+      {/* Save Medicine Prompt Dialog */}
+      <Dialog
+        open={saveMedPromptOpen}
+        onOpenChange={(o) => {
+          if (!isSavingMed) setSaveMedPromptOpen(o);
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-sm"
+          data-ocid="billing.save_medicine_prompt.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>Save medicine to inventory?</DialogTitle>
+            <DialogDescription className="pt-1">
+              Do you want to save this medicine to your inventory for future
+              use?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setSaveMedPromptOpen(false)}
+              data-ocid="billing.skip_save_medicine.button"
+            >
+              No, skip
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setNewMedOpen(true);
+                setSaveMedPromptOpen(false);
+              }}
+              data-ocid="billing.confirm_save_medicine.button"
+            >
+              Yes, save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Bill header */}
         <Card className="xl:col-span-3 shadow-card">
           <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {/* Bill No */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+              {/* Invoice No - editable */}
               <div>
-                <Label className="text-xs text-muted-foreground">Bill No</Label>
-                <p className="font-bold text-foreground mt-0.5">{billNoStr}</p>
+                <Label
+                  className="text-xs text-muted-foreground"
+                  htmlFor="invoice-no"
+                >
+                  Invoice No
+                </Label>
+                <Input
+                  id="invoice-no"
+                  data-ocid="billing.invoice_no.input"
+                  className="h-8 text-sm mt-0.5 font-medium"
+                  placeholder={defaultBillNoStr}
+                  value={invoiceNo}
+                  onChange={(e) => setInvoiceNo(e.target.value)}
+                />
               </div>
 
-              {/* Date */}
+              {/* Date - editable */}
               <div>
-                <Label className="text-xs text-muted-foreground">Date</Label>
-                <p className="text-foreground mt-0.5">{today}</p>
+                <Label
+                  className="text-xs text-muted-foreground"
+                  htmlFor="invoice-date"
+                >
+                  Date
+                </Label>
+                <Input
+                  id="invoice-date"
+                  data-ocid="billing.invoice_date.input"
+                  className="h-8 text-sm mt-0.5"
+                  placeholder="DD/MM/YYYY"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                />
               </div>
 
               {/* Patient Name */}
@@ -836,6 +955,24 @@ export default function NewBill() {
                   placeholder="Doctor name..."
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
+                />
+              </div>
+
+              {/* Doctor Reg No */}
+              <div>
+                <Label
+                  className="text-xs text-muted-foreground"
+                  htmlFor="doctor-reg-no"
+                >
+                  Doctor Reg No
+                </Label>
+                <Input
+                  id="doctor-reg-no"
+                  data-ocid="billing.doctor_reg_no.input"
+                  className="h-8 text-sm mt-0.5"
+                  placeholder="e.g. MCI-12345"
+                  value={doctorRegNo}
+                  onChange={(e) => setDoctorRegNo(e.target.value)}
                 />
               </div>
 
@@ -963,7 +1100,7 @@ export default function NewBill() {
                       className="text-center text-muted-foreground text-xs py-8"
                       data-ocid="billing.items.empty_state"
                     >
-                      Click "Add Item" to start adding medicines
+                      Click &quot;Add Item&quot; to start adding medicines
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -998,7 +1135,6 @@ export default function NewBill() {
                                 setMedSearch(row.medicineName);
                               }}
                               onBlur={() => {
-                                // Delay to allow click events on dropdown items
                                 setTimeout(() => setMedDropOpen(null), 200);
                               }}
                               data-ocid="billing.medicine_search.input"

@@ -96,17 +96,39 @@ export interface BillItem {
     unitPrice: bigint;
     medicineId: bigint;
 }
+export interface PurchaseItem {
+    mrp: bigint;
+    qty: bigint;
+    purchaseRate: bigint;
+    gstPercent: bigint;
+    freeQty: bigint;
+    batch: string;
+    expiry: string;
+    medicineId: bigint;
+    amount: bigint;
+    medicineName: string;
+}
 export type Time = bigint;
-export interface Bill {
+export interface Distributor {
     id: bigint;
+    drugLicenseNumber: string;
+    gstNumber: string;
+    name: string;
+    contactPerson: string;
+    email: string;
+    address: string;
+    phone: string;
+}
+export interface Purchase {
+    id: bigint;
+    purchaseDate: Time;
+    distributorName: string;
+    distributorId: bigint;
     totalGST: bigint;
     grandTotal: bigint;
-    billDate: Time;
-    billNumber: bigint;
-    paymentMode: PaymentMode;
-    customerId: bigint;
-    items: Array<BillItem>;
-    totalDiscount: bigint;
+    invoiceDate: string;
+    invoiceNumber: string;
+    items: Array<PurchaseItem>;
     subtotal: bigint;
 }
 export interface Medicine {
@@ -124,6 +146,18 @@ export interface Medicine {
     genericName: string;
     reorderLevel: bigint;
     currentStock: bigint;
+}
+export interface Bill {
+    id: bigint;
+    totalGST: bigint;
+    grandTotal: bigint;
+    billDate: Time;
+    billNumber: bigint;
+    paymentMode: PaymentMode;
+    customerId: bigint;
+    items: Array<BillItem>;
+    totalDiscount: bigint;
+    subtotal: bigint;
 }
 export interface DashboardStats {
     todayBillCount: bigint;
@@ -160,25 +194,35 @@ export enum UserRole {
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     addCustomer(cust: Customer): Promise<bigint>;
+    addDistributor(dist: Distributor): Promise<bigint>;
     addMedicine(med: Medicine): Promise<bigint>;
+    addPurchase(purchase: Purchase): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    assignRole(user: Principal, role: UserRole): Promise<void>;
     createBill(bill: Bill): Promise<bigint>;
     deleteCustomer(id: bigint): Promise<void>;
+    deleteDistributor(id: bigint): Promise<void>;
     deleteMedicine(id: bigint): Promise<void>;
     getAllBills(): Promise<Array<Bill>>;
     getAllCustomers(): Promise<Array<Customer>>;
+    getAllDistributors(): Promise<Array<Distributor>>;
     getAllMedicines(): Promise<Array<Medicine>>;
+    getAllPurchases(): Promise<Array<Purchase>>;
     getBill(id: bigint): Promise<Bill>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCustomer(id: bigint): Promise<Customer>;
     getDashboardStats(): Promise<DashboardStats>;
+    getDistributor(id: bigint): Promise<Distributor>;
     getMedicine(id: bigint): Promise<Medicine>;
+    getPurchase(id: bigint): Promise<Purchase>;
+    getPurchasesByDistributor(distributorId: bigint): Promise<Array<Purchase>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initialize(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateCustomer(cust: Customer): Promise<void>;
+    updateDistributor(dist: Distributor): Promise<void>;
     updateMedicine(med: Medicine): Promise<void>;
 }
 import type { Bill as _Bill, BillItem as _BillItem, Medicine as _Medicine, PaymentMode as _PaymentMode, Time as _Time, Unit as _Unit, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
@@ -212,6 +256,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async addDistributor(arg0: Distributor): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addDistributor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addDistributor(arg0);
+            return result;
+        }
+    }
     async addMedicine(arg0: Medicine): Promise<bigint> {
         if (this.processError) {
             try {
@@ -226,6 +284,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async addPurchase(arg0: Purchase): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addPurchase(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addPurchase(arg0);
+            return result;
+        }
+    }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
         if (this.processError) {
             try {
@@ -237,6 +309,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n5(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async assignRole(arg0: Principal, arg1: UserRole): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignRole(arg0, to_candid_UserRole_n5(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignRole(arg0, to_candid_UserRole_n5(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
@@ -265,6 +351,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteCustomer(arg0);
+            return result;
+        }
+    }
+    async deleteDistributor(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteDistributor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteDistributor(arg0);
             return result;
         }
     }
@@ -310,6 +410,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getAllDistributors(): Promise<Array<Distributor>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllDistributors();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllDistributors();
+            return result;
+        }
+    }
     async getAllMedicines(): Promise<Array<Medicine>> {
         if (this.processError) {
             try {
@@ -322,6 +436,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getAllMedicines();
             return from_candid_vec_n16(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getAllPurchases(): Promise<Array<Purchase>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllPurchases();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllPurchases();
+            return result;
         }
     }
     async getBill(arg0: bigint): Promise<Bill> {
@@ -394,6 +522,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getDistributor(arg0: bigint): Promise<Distributor> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getDistributor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getDistributor(arg0);
+            return result;
+        }
+    }
     async getMedicine(arg0: bigint): Promise<Medicine> {
         if (this.processError) {
             try {
@@ -406,6 +548,34 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getMedicine(arg0);
             return from_candid_Medicine_n17(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPurchase(arg0: bigint): Promise<Purchase> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPurchase(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPurchase(arg0);
+            return result;
+        }
+    }
+    async getPurchasesByDistributor(arg0: bigint): Promise<Array<Purchase>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPurchasesByDistributor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPurchasesByDistributor(arg0);
+            return result;
         }
     }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
@@ -475,6 +645,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateCustomer(arg0);
+            return result;
+        }
+    }
+    async updateDistributor(arg0: Distributor): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateDistributor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateDistributor(arg0);
             return result;
         }
     }

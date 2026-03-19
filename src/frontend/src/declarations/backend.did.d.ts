@@ -42,6 +42,16 @@ export interface DashboardStats {
   'todayTotalSales' : bigint,
   'totalMedicinesInStock' : bigint,
 }
+export interface Distributor {
+  'id' : bigint,
+  'drugLicenseNumber' : string,
+  'gstNumber' : string,
+  'name' : string,
+  'contactPerson' : string,
+  'email' : string,
+  'address' : string,
+  'phone' : string,
+}
 export interface Medicine {
   'id' : bigint,
   'manufacturer' : string,
@@ -61,6 +71,30 @@ export interface Medicine {
 export type PaymentMode = { 'UPI' : null } |
   { 'card' : null } |
   { 'cash' : null };
+export interface Purchase {
+  'id' : bigint,
+  'purchaseDate' : Time,
+  'distributorName' : string,
+  'distributorId' : bigint,
+  'totalGST' : bigint,
+  'grandTotal' : bigint,
+  'invoiceDate' : string,
+  'invoiceNumber' : string,
+  'items' : Array<PurchaseItem>,
+  'subtotal' : bigint,
+}
+export interface PurchaseItem {
+  'mrp' : bigint,
+  'qty' : bigint,
+  'purchaseRate' : bigint,
+  'gstPercent' : bigint,
+  'freeQty' : bigint,
+  'batch' : string,
+  'expiry' : string,
+  'medicineId' : bigint,
+  'amount' : bigint,
+  'medicineName' : string,
+}
 export type Time = bigint;
 export type Unit = { 'bottle' : null } |
   { 'tablet' : null } |
@@ -72,25 +106,35 @@ export type UserRole = { 'admin' : null } |
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addCustomer' : ActorMethod<[Customer], bigint>,
+  'addDistributor' : ActorMethod<[Distributor], bigint>,
   'addMedicine' : ActorMethod<[Medicine], bigint>,
+  'addPurchase' : ActorMethod<[Purchase], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'assignRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createBill' : ActorMethod<[Bill], bigint>,
   'deleteCustomer' : ActorMethod<[bigint], undefined>,
+  'deleteDistributor' : ActorMethod<[bigint], undefined>,
   'deleteMedicine' : ActorMethod<[bigint], undefined>,
   'getAllBills' : ActorMethod<[], Array<Bill>>,
   'getAllCustomers' : ActorMethod<[], Array<Customer>>,
+  'getAllDistributors' : ActorMethod<[], Array<Distributor>>,
   'getAllMedicines' : ActorMethod<[], Array<Medicine>>,
+  'getAllPurchases' : ActorMethod<[], Array<Purchase>>,
   'getBill' : ActorMethod<[bigint], Bill>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCustomer' : ActorMethod<[bigint], Customer>,
   'getDashboardStats' : ActorMethod<[], DashboardStats>,
+  'getDistributor' : ActorMethod<[bigint], Distributor>,
   'getMedicine' : ActorMethod<[bigint], Medicine>,
+  'getPurchase' : ActorMethod<[bigint], Purchase>,
+  'getPurchasesByDistributor' : ActorMethod<[bigint], Array<Purchase>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'initialize' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'updateCustomer' : ActorMethod<[Customer], undefined>,
+  'updateDistributor' : ActorMethod<[Distributor], undefined>,
   'updateMedicine' : ActorMethod<[Medicine], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

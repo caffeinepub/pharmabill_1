@@ -9,12 +9,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Clock,
+  Database,
   FileText,
   IndianRupee,
   Package,
+  RotateCcw,
+  ShoppingCart,
+  Upload,
 } from "lucide-react";
 import {
   useGetBills,
@@ -25,15 +31,12 @@ import {
 function fmt(n: bigint | undefined) {
   return n !== undefined ? Number(n).toLocaleString("en-IN") : "0";
 }
-
 function fmtCurrency(n: bigint | undefined) {
   return `₹${fmt(n)}`;
 }
-
 function fmtDate(ns: bigint) {
   return new Date(Number(ns) / 1_000_000).toLocaleDateString("en-IN");
 }
-
 function billNo(n: bigint) {
   return `INV-${String(Number(n)).padStart(4, "0")}`;
 }
@@ -69,10 +72,77 @@ const KPI_CARDS = [
   },
 ];
 
+const QUICK_ACTIONS = [
+  {
+    label: "New Bill",
+    description: "Create a new patient invoice",
+    icon: FileText,
+    to: "/new-bill",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    border: "border-blue-100 hover:border-blue-300",
+  },
+  {
+    label: "New Purchase",
+    description: "Record stock from distributor",
+    icon: ShoppingCart,
+    to: "/purchase-entry",
+    color: "text-indigo-600",
+    bg: "bg-indigo-50",
+    border: "border-indigo-100 hover:border-indigo-300",
+  },
+  {
+    label: "Add Medicine",
+    description: "Add or update inventory stock",
+    icon: Package,
+    to: "/inventory",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-100 hover:border-emerald-300",
+  },
+  {
+    label: "Sales Return",
+    description: "Record customer medicine returns",
+    icon: RotateCcw,
+    to: "/sales-return",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-100 hover:border-amber-300",
+  },
+  {
+    label: "Purchase Return",
+    description: "Return medicines to supplier",
+    icon: ArrowLeftRight,
+    to: "/purchase-return",
+    color: "text-purple-600",
+    bg: "bg-purple-50",
+    border: "border-purple-100 hover:border-purple-300",
+  },
+  {
+    label: "Backup Data",
+    description: "Export all pharmacy data",
+    icon: Database,
+    to: "/backup-restore",
+    color: "text-teal-600",
+    bg: "bg-teal-50",
+    border: "border-teal-100 hover:border-teal-300",
+  },
+  {
+    label: "Restore Data",
+    description: "Import from a backup file",
+    icon: Upload,
+    to: "/backup-restore",
+    color: "text-rose-600",
+    bg: "bg-rose-50",
+    border: "border-rose-100 hover:border-rose-300",
+  },
+];
+
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: bills, isLoading: billsLoading } = useGetBills();
   const { data: medicines, isLoading: medsLoading } = useGetMedicines();
+  const navigate = useNavigate();
 
   const recentBills = [...(bills ?? [])]
     .sort((a, b) => Number(b.billDate - a.billDate))
@@ -91,7 +161,6 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {KPI_CARDS.map((kpi) => {
           const val = stats?.[kpi.key as keyof typeof stats] as
@@ -127,8 +196,36 @@ export default function Dashboard() {
         })}
       </div>
 
+      <div data-ocid="dashboard.quick_actions.section">
+        <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Quick Actions
+        </h2>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          {QUICK_ACTIONS.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={() => navigate({ to: action.to })}
+              className={`flex items-center gap-3 p-4 rounded-lg border bg-white transition-all hover:shadow-md cursor-pointer text-left ${action.border}`}
+              data-ocid={`dashboard.${action.label.toLowerCase().replace(/ /g, "_")}.button`}
+            >
+              <div className={`p-2 rounded-lg ${action.bg} flex-shrink-0`}>
+                <action.icon className={`h-5 w-5 ${action.color}`} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {action.label}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {action.description}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Recent Bills */}
         <Card className="shadow-card" data-ocid="dashboard.recent_bills.card">
           <CardHeader className="pb-3 pt-4 px-5">
             <CardTitle className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -204,7 +301,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Stock */}
         <Card className="shadow-card" data-ocid="dashboard.low_stock.card">
           <CardHeader className="pb-3 pt-4 px-5">
             <CardTitle className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">

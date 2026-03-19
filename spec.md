@@ -1,25 +1,31 @@
 # PharmaBill
 
 ## Current State
-- Backend requires #admin permission for addMedicine/updateMedicine/deleteMedicine (already fixed to #user)
-- NewBill.tsx has inline add-customer dialog but no inline add-medicine
-- Inventory.tsx allows adding medicine but only admins could save (now fixed)
+PharmaBill is a pharmacy billing app with a Motoko backend on the Internet Computer. All data (medicines, customers, bills, distributors, purchases) is stored on the IC backend and accessed via React Query hooks in `useQueries.ts`. The actor is created in `useActor.ts`. Pharmacy profile is the only data stored in localStorage. There is no offline support — if internet is unavailable, the app cannot load or save data.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Inline "Add New Medicine" quick-dialog in NewBill.tsx, triggered by a "+" button next to the medicine search field in each row. Dialog fields: Name, Generic Name, Batch, Expiry, HSN, Unit, Selling Price, Purchase Price, GST%, Stock Qty. After saving, auto-selects the new medicine in the row.
-- useAddMedicine hook already exists in useQueries.ts
+- `useOfflineStore.ts` hook: manages localStorage-based cache for medicines, customers, bills, distributors, purchases
+- `useOnlineStatus.ts` hook: detects online/offline status using browser events
+- `usePendingSync.ts` hook: queues mutations made while offline and replays them when back online
+- Online/offline status indicator badge in Layout.tsx header (green = online, red = offline)
+- On first load (online), populate localStorage cache from backend data
+- When offline: all reads served from localStorage cache; all writes saved locally and queued
+- When back online: pending queue is flushed to backend, then cache is refreshed
+- Toast notification when going offline and when sync completes on reconnect
 
 ### Modify
-- NewBill.tsx: add AddMedicineDialog component (similar to existing new-customer dialog) and wire it to the medicine search row
-- Inventory.tsx: no changes needed — backend permission fix handles the save error
+- `useQueries.ts`: wrap all queries to fall back to localStorage cache when actor call fails or device is offline; wrap all mutations to queue locally when offline
+- `Layout.tsx`: add online/offline indicator badge in the header
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Add AddMedicineDialog state and UI to NewBill.tsx
-2. Show a small "+" icon button next to medicine search in each row OR a single floating "Add New Medicine" link in the dropdown when no match found
-3. On save, call useAddMedicine, then selectMedicine with the new medicine
-4. Validate and show toast on success/error
+1. Create `useOnlineStatus.ts` — simple hook using `window.addEventListener('online'/'offline')`
+2. Create `useOfflineStore.ts` — read/write each data type to localStorage with typed helpers
+3. Modify `useQueries.ts` — detect offline state, serve from cache on reads, queue mutations on writes
+4. Create sync logic — on reconnect, flush queued mutations to backend, then invalidate all queries
+5. Modify `Layout.tsx` — add a small colored dot/badge showing Online/Offline status
+6. Add toast notifications for offline mode entry and sync completion

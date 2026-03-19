@@ -18,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Printer, Search } from "lucide-react";
+import { Download, Eye, Printer, Search } from "lucide-react";
 import { useState } from "react";
+import { getPharmacyProfile } from "../hooks/usePharmacyProfile";
 import {
   type Bill,
   useGetBills,
@@ -28,7 +29,7 @@ import {
 } from "../hooks/useQueries";
 
 function billNo(n: bigint) {
-  return `${String(Number(n)).padStart(4, "0")}`;
+  return `INV-${String(Number(n)).padStart(4, "0")}`;
 }
 function fmtDate(ns: bigint) {
   const d = new Date(Number(ns) / 1_000_000);
@@ -100,6 +101,261 @@ function getPackStr(unit: string): string {
   return "1x10";
 }
 
+function buildInvoiceHtml(
+  bill: Bill,
+  custMap: Record<string, any>,
+  medMap: Record<string, any>,
+): string {
+  const cust = custMap[String(bill.customerId)];
+  const profile = getPharmacyProfile();
+  const grandTotalNum = Math.round(Number(bill.grandTotal));
+  const subtotalNum = Number(bill.subtotal);
+  const totalGSTNum = Number(bill.totalGST);
+  const sgst = totalGSTNum / 2;
+  const cgst = totalGSTNum / 2;
+  const roundoff = grandTotalNum - (subtotalNum + totalGSTNum);
+  const amountInWords = numberToWords(grandTotalNum);
+
+  const itemRows = bill.items
+    .map((item, idx) => {
+      const med = medMap[String(item.medicineId)];
+      const qty = Number(item.quantity);
+      const mrp = Number(item.unitPrice);
+      const gstPct = Number(med?.gstPercent ?? 5);
+      const halfGst = gstPct / 2;
+      const amount = qty * mrp;
+      const pack = getPackStr(med?.unit ?? "tablet");
+      const hsn = (med as any)?.hsnCode ?? "";
+      const batch = (med as any)?.batchNumber ?? "";
+      const expiry = (med as any)?.expiryDate ?? "";
+      return `
+        <tr>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${idx + 1}</td>
+          <td style="padding:3px 6px;border:1px solid #ccc">${med?.name ?? "Unknown"}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${pack}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${hsn}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${batch}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${expiry}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${qty}</td>
+          <td style="text-align:right;padding:3px 6px;border:1px solid #ccc">${mrp.toFixed(2)}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${halfGst.toFixed(2)}</td>
+          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${halfGst.toFixed(2)}</td>
+          <td style="text-align:right;padding:3px 6px;border:1px solid #ccc"><strong>${amount.toFixed(2)}</strong></td>
+        </tr>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Tax Invoice - ${billNo(bill.billNumber)}</title>
+  <style>
+    @media print {
+      body { margin: 0; }
+      @page { margin: 8mm; size: A4; }
+      .no-print { display: none !important; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #000;
+      background: #fff;
+      margin: 10px;
+      max-width: 210mm;
+    }
+    .outer-border { border: 2px solid #000; padding: 0; }
+    .header-section { padding: 8px 12px 6px; text-align: center; border-bottom: 1px solid #000; }
+    .company-name {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .company-sub { font-size: 10px; line-height: 1.7; }
+    .invoice-title {
+      text-align: center;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 4px;
+      background: #f0f0f0;
+    }
+    .bill-meta {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 12px;
+      border-bottom: 1px solid #000;
+      font-size: 11px;
+      line-height: 2;
+    }
+    .lbl { color: #444; }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    table.items th {
+      background: #e0e0e0;
+      border: 1px solid #888;
+      padding: 4px 3px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 9.5px;
+      white-space: nowrap;
+    }
+    table.totals {
+      border-collapse: collapse;
+      min-width: 280px;
+    }
+    table.totals td {
+      padding: 3px 8px;
+      font-size: 11px;
+      border-bottom: 1px solid #eee;
+    }
+    table.totals tr.grand td {
+      font-size: 13px;
+      font-weight: bold;
+      background: #e0e0e0;
+      border-top: 2px solid #000;
+      padding: 5px 8px;
+    }
+    .amount-words {
+      border-top: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      padding: 5px 12px;
+      font-size: 10.5px;
+      background: #fafafa;
+    }
+    .bottom-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 8px 12px;
+      border-top: 1px solid #000;
+      font-size: 10px;
+    }
+    .terms-side { max-width: 55%; line-height: 1.7; }
+    .totals-side { min-width: 280px; }
+    .terms { line-height: 1.7; }
+    .sign-line {
+      border-top: 1px solid #000;
+      width: 150px;
+      margin-top: 30px;
+      text-align: center;
+      padding-top: 4px;
+      font-weight: bold;
+      font-size: 10px;
+    }
+    .get-well {
+      text-align: center;
+      font-weight: bold;
+      font-size: 12px;
+      letter-spacing: 2px;
+      border-top: 1px solid #000;
+      padding: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="outer-border">
+
+  <div class="header-section">
+    <div class="company-name">${profile.name}</div>
+    <div class="company-sub">
+      ${profile.address1}${profile.address2 ? `, ${profile.address2}` : ""}<br/>
+      Ph: ${profile.phone} &nbsp;|&nbsp; Email: ${profile.email}<br/>
+      GSTIN: ${profile.gstin} &nbsp;|&nbsp; D.L.No.: ${profile.dlNo1} / ${profile.dlNo2}
+    </div>
+  </div>
+
+  <div class="invoice-title">GST INVOICE</div>
+
+  <div class="bill-meta">
+    <div class="bill-meta-left">
+      <div><span class="lbl">Patient Name : </span><strong>${cust?.name ?? "Walk-in Customer"}</strong></div>
+      <div><span class="lbl">Ph. No &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span>${cust?.phone ?? "—"}</div>
+      <div><span class="lbl">Doctor Name &nbsp;: </span><strong>${cust?.email ?? "—"}</strong></div>
+      <div><span class="lbl">Doctor Reg No: </span>${cust?.address ?? "—"}</div>
+    </div>
+    <div class="bill-meta-right" style="text-align:right">
+      <div><span class="lbl">Invoice No : </span><strong>${billNo(bill.billNumber)}</strong></div>
+      <div><span class="lbl">Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span><strong>${fmtDate(bill.billDate)}</strong></div>
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:28px">S.No</th>
+        <th style="width:160px">Product Name</th>
+        <th style="width:44px">Pack</th>
+        <th style="width:50px">HSN</th>
+        <th style="width:70px">Batch</th>
+        <th style="width:50px">Expiry</th>
+        <th style="width:30px">Qty</th>
+        <th style="width:62px">MRP</th>
+        <th style="width:44px">SGST%</th>
+        <th style="width:44px">CGST%</th>
+        <th style="width:68px">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+    </tbody>
+  </table>
+
+  <div class="amount-words">
+    <strong>Amount in Words:</strong> ${amountInWords}
+  </div>
+
+  <div class="bottom-section">
+    <div class="terms-side">
+      <div class="terms">
+        <strong>Terms &amp; Conditions:</strong><br/>
+        1. Goods once sold will not be taken back or exchanged.<br/>
+        2. Subject to Delhi jurisdiction only.<br/>
+        3. All disputes subject to Delhi courts.
+      </div>
+      <div class="sign-line">Authorized Signatory</div>
+    </div>
+    <div class="totals-side">
+      <table class="totals">
+        <tr>
+          <td>Sub Total</td>
+          <td style="text-align:right">₹${subtotalNum.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>SGST 2.5%</td>
+          <td style="text-align:right">₹${sgst.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>CGST 2.5%</td>
+          <td style="text-align:right">₹${cgst.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>Roundoff</td>
+          <td style="text-align:right">${roundoff >= 0 ? "+" : ""}${roundoff.toFixed(2)}</td>
+        </tr>
+        <tr class="grand">
+          <td>Grand Total</td>
+          <td style="text-align:right">₹${grandTotalNum.toLocaleString("en-IN")}.00</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="get-well">*** Get Well Soon ***</div>
+
+</div>
+</body>
+</html>`;
+}
+
 export default function BillHistory() {
   const { data: bills = [], isLoading } = useGetBills();
   const { data: customers = [] } = useGetCustomers();
@@ -121,272 +377,30 @@ export default function BillHistory() {
     );
   });
 
-  const handlePrint = (bill: Bill) => {
-    const cust = custMap[String(bill.customerId)];
-    const grandTotalNum = Math.round(Number(bill.grandTotal));
-    const subtotalNum = Number(bill.subtotal);
-    const totalGSTNum = Number(bill.totalGST);
-    const sgst = totalGSTNum / 2;
-    const cgst = totalGSTNum / 2;
-    const roundoff = grandTotalNum - (subtotalNum + totalGSTNum);
-    const amountInWords = numberToWords(grandTotalNum);
-
-    const itemRows = bill.items
-      .map((item, idx) => {
-        const med = medMap[String(item.medicineId)];
-        const qty = Number(item.quantity);
-        const mrp = Number(item.unitPrice);
-        const gstPct = Number(med?.gstPercent ?? 5);
-        const halfGst = gstPct / 2;
-        const amount = qty * mrp;
-        const pack = getPackStr(med?.unit ?? "tablet");
-        const hsn = (med as any)?.hsnCode ?? "";
-        const batch = (med as any)?.batchNumber ?? "";
-        const expiry = (med as any)?.expiryDate ?? "";
-        return `
-          <tr>
-            <td style="text-align:center;padding:3px 4px">${idx + 1}</td>
-            <td style="padding:3px 6px">${med?.name ?? "Unknown"}</td>
-            <td style="text-align:center;padding:3px 4px">${pack}</td>
-            <td style="text-align:center;padding:3px 4px">${hsn}</td>
-            <td style="text-align:center;padding:3px 4px">${batch}</td>
-            <td style="text-align:center;padding:3px 4px">${expiry}</td>
-            <td style="text-align:center;padding:3px 4px">${qty}</td>
-            <td style="text-align:right;padding:3px 6px">${mrp.toFixed(2)}</td>
-            <td style="text-align:center;padding:3px 4px">${halfGst.toFixed(2)}</td>
-            <td style="text-align:center;padding:3px 4px">${halfGst.toFixed(2)}</td>
-            <td style="text-align:right;padding:3px 6px"><strong>${amount.toFixed(2)}</strong></td>
-          </tr>`;
-      })
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Tax Invoice - ${billNo(bill.billNumber)}</title>
-  <style>
-    @media print {
-      body { margin: 0; }
-      @page { margin: 8mm; }
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: Arial, sans-serif;
-      font-size: 11px;
-      color: #000;
-      background: #fff;
-      margin: 10px;
-      max-width: 210mm;
-    }
-    .outer-border { border: 2px solid #000; padding: 0; }
-    .header-section { padding: 8px 12px 6px; text-align: center; border-bottom: 1px solid #000; }
-    .company-name {
-      font-size: 22px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 3px;
-    }
-    .company-sub { font-size: 10px; line-height: 1.7; }
-    .invoice-title {
-      text-align: center;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 3px;
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      padding: 4px;
-      background: #f5f5f5;
-    }
-    .bill-meta {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 12px;
-      border-bottom: 1px solid #000;
-      font-size: 11px;
-      line-height: 1.9;
-    }
-    .bill-meta-left { }
-    .bill-meta-right { text-align: right; }
-    .lbl { font-weight: normal; color: #333; }
-    table.items {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 10px;
-    }
-    table.items th {
-      background: #e8e8e8;
-      border: 1px solid #888;
-      padding: 4px 3px;
-      text-align: center;
-      font-weight: bold;
-      font-size: 9.5px;
-      white-space: nowrap;
-    }
-    table.items td {
-      border: 1px solid #ccc;
-    }
-    .totals-section {
-      padding: 6px 12px;
-      display: flex;
-      justify-content: flex-end;
-      border-top: 1px solid #000;
-    }
-    table.totals {
-      border-collapse: collapse;
-      min-width: 260px;
-    }
-    table.totals td {
-      padding: 3px 8px;
-      font-size: 11px;
-    }
-    table.totals tr.grand td {
-      font-size: 13px;
-      font-weight: bold;
-      background: #e8e8e8;
-      border-top: 2px solid #000;
-      padding: 5px 8px;
-    }
-    .amount-words {
-      border-top: 1px solid #ccc;
-      border-bottom: 1px solid #ccc;
-      padding: 5px 12px;
-      font-size: 10.5px;
-      background: #fafafa;
-    }
-    .footer-section {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 12px 6px;
-      border-top: 1px solid #ccc;
-      font-size: 10px;
-    }
-    .terms { max-width: 60%; line-height: 1.7; }
-    .signatory { text-align: right; }
-    .sign-line {
-      border-top: 1px solid #000;
-      width: 150px;
-      margin-top: 28px;
-      margin-left: auto;
-      text-align: center;
-      padding-top: 4px;
-      font-weight: bold;
-      font-size: 10px;
-    }
-    .get-well {
-      text-align: center;
-      font-weight: bold;
-      font-size: 12px;
-      letter-spacing: 2px;
-      border-top: 1px solid #000;
-      padding: 6px;
-    }
-  </style>
-</head>
-<body>
-<div class="outer-border">
-
-  <div class="header-section">
-    <div class="company-name">AMBICURE HEALTHCARE AND PHARMACY</div>
-    <div class="company-sub">
-      F 13 Street No 6, Brahampuri, Moni Baba Mandir Road, Delhi 110053<br/>
-      Ph: 9953774706 &nbsp;|&nbsp; Email: AMBICUREHEALTHCARE@GMAIL.COM<br/>
-      GSTIN: 07BXUPG3995C1Z1 &nbsp;|&nbsp; D.L.No.: RLF20DL2025001813 / 1805
-    </div>
-  </div>
-
-  <div class="invoice-title">TAX INVOICE</div>
-
-  <div class="bill-meta">
-    <div class="bill-meta-left">
-      <div><span class="lbl">Bill No &nbsp;: </span><strong>${billNo(bill.billNumber)}</strong></div>
-      <div><span class="lbl">Date &nbsp;&nbsp;&nbsp;&nbsp;: </span><strong>${fmtDate(bill.billDate)}</strong></div>
-      <div><span class="lbl">Patient &nbsp;: </span><strong>${cust?.name ?? "Walk-in Customer"}</strong></div>
-      <div><span class="lbl">PH &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span>${cust?.phone ?? "—"}</div>
-    </div>
-    <div class="bill-meta-right">
-      <div><span class="lbl">Doctor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span><strong>${cust?.email ?? "—"}</strong></div>
-      <div><span class="lbl">Payment &nbsp;&nbsp;&nbsp;: </span><strong style="text-transform:uppercase">${bill.paymentMode}</strong></div>
-    </div>
-  </div>
-
-  <table class="items">
-    <thead>
-      <tr>
-        <th style="width:28px">#</th>
-        <th style="width:160px">Product Name</th>
-        <th style="width:44px">Pack</th>
-        <th style="width:50px">HSN</th>
-        <th style="width:70px">Batch</th>
-        <th style="width:44px">Exp</th>
-        <th style="width:30px">Qty</th>
-        <th style="width:62px">MRP</th>
-        <th style="width:44px">SGST%</th>
-        <th style="width:44px">CGST%</th>
-        <th style="width:68px">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemRows}
-    </tbody>
-  </table>
-
-  <div class="totals-section">
-    <table class="totals">
-      <tr>
-        <td>Sub Total</td>
-        <td style="text-align:right">₹${subtotalNum.toFixed(2)}</td>
-      </tr>
-      <tr>
-        <td>SGST 2.5%</td>
-        <td style="text-align:right">₹${sgst.toFixed(2)}</td>
-      </tr>
-      <tr>
-        <td>CGST 2.5%</td>
-        <td style="text-align:right">₹${cgst.toFixed(2)}</td>
-      </tr>
-      <tr>
-        <td>Roundoff</td>
-        <td style="text-align:right">${roundoff >= 0 ? "+" : ""}${roundoff.toFixed(2)}</td>
-      </tr>
-      <tr class="grand">
-        <td>Grand Total</td>
-        <td style="text-align:right">₹${grandTotalNum.toLocaleString("en-IN")}.00</td>
-      </tr>
-    </table>
-  </div>
-
-  <div class="amount-words">
-    <strong>Amount in Words:</strong> ${amountInWords}
-  </div>
-
-  <div class="footer-section">
-    <div class="terms">
-      <strong>Terms &amp; Conditions:</strong><br/>
-      1. Goods once sold will not be taken back or exchanged.<br/>
-      2. Subject to Delhi jurisdiction only.<br/>
-      3. All disputes subject to Delhi courts.
-    </div>
-    <div class="signatory">
-      <div class="sign-line">Authorized Signatory</div>
-    </div>
-  </div>
-
-  <div class="get-well">*** Get Well Soon ***</div>
-
-</div>
-</body>
-</html>`;
-
+  const openPrintWindow = (bill: Bill, autoprint = true) => {
+    const html = buildInvoiceHtml(bill, custMap, medMap);
     const w = window.open("", "_blank");
     if (w) {
       w.document.write(html);
       w.document.close();
+      if (autoprint) {
+        setTimeout(() => {
+          w.print();
+        }, 500);
+      }
+    }
+  };
+
+  const handleDownload = (bill: Bill) => {
+    const html = buildInvoiceHtml(bill, custMap, medMap);
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      // Give browser time to render, then trigger print (save as PDF)
       setTimeout(() => {
         w.print();
-        w.close();
-      }, 500);
+      }, 600);
     }
   };
 
@@ -432,9 +446,10 @@ export default function BillHistory() {
                     "Bill No",
                     "Date",
                     "Customer",
+                    "Doctor",
+                    "Doctor Reg No",
                     "Items",
                     "Total",
-                    "Payment",
                     "",
                   ].map((h) => (
                     <TableHead
@@ -450,7 +465,7 @@ export default function BillHistory() {
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center text-muted-foreground text-xs py-10"
                       data-ocid="history.empty_state"
                     >
@@ -476,19 +491,15 @@ export default function BillHistory() {
                         {custMap[String(bill.customerId)]?.name ?? "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
+                        {custMap[String(bill.customerId)]?.email ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">—</TableCell>
+                      <TableCell className="text-muted-foreground">
                         {bill.items.length} item
                         {bill.items.length !== 1 ? "s" : ""}
                       </TableCell>
                       <TableCell className="font-semibold">
                         {fmtCurrency(bill.grandTotal)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] capitalize"
-                        >
-                          {bill.paymentMode}
-                        </Badge>
                       </TableCell>
                       <TableCell className="pr-5">
                         <div className="flex items-center gap-1 justify-end">
@@ -505,10 +516,21 @@ export default function BillHistory() {
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
-                            onClick={() => handlePrint(bill)}
+                            onClick={() => openPrintWindow(bill)}
+                            title="Print Invoice"
                             data-ocid={`history.print_button.${idx + 1}`}
                           >
                             <Printer className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700"
+                            onClick={() => handleDownload(bill)}
+                            title="Download PDF"
+                            data-ocid={`history.download_button.${idx + 1}`}
+                          >
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -532,7 +554,7 @@ export default function BillHistory() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-4 gap-2 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground text-xs">Date</span>
                     <p className="font-medium">{fmtDate(selected.billDate)}</p>
@@ -546,6 +568,12 @@ export default function BillHistory() {
                     </p>
                   </div>
                   <div>
+                    <span className="text-muted-foreground text-xs">Phone</span>
+                    <p className="font-medium">
+                      {custMap[String(selected.customerId)]?.phone ?? "—"}
+                    </p>
+                  </div>
+                  <div>
                     <span className="text-muted-foreground text-xs">
                       Doctor
                     </span>
@@ -555,10 +583,24 @@ export default function BillHistory() {
                   </div>
                   <div>
                     <span className="text-muted-foreground text-xs">
-                      Payment
+                      Doctor Reg No
                     </span>
-                    <p className="capitalize font-medium">
-                      {selected.paymentMode}
+                    <p className="font-medium text-muted-foreground">—</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">
+                      Address
+                    </span>
+                    <p className="font-medium">
+                      {custMap[String(selected.customerId)]?.address || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">
+                      Grand Total
+                    </span>
+                    <p className="font-bold text-primary text-base">
+                      {fmtCurrency(selected.grandTotal)}
                     </p>
                   </div>
                 </div>
@@ -666,14 +708,24 @@ export default function BillHistory() {
                     </span>
                   </div>
                 </div>
-                <Button
-                  className="w-full gap-2"
-                  variant="outline"
-                  onClick={() => handlePrint(selected)}
-                  data-ocid="history.dialog_print.button"
-                >
-                  <Printer className="h-4 w-4" /> Print Invoice
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    className="flex-1 gap-2"
+                    variant="outline"
+                    onClick={() => openPrintWindow(selected)}
+                    data-ocid="history.dialog_print.button"
+                  >
+                    <Printer className="h-4 w-4" /> Print Invoice
+                  </Button>
+                  <Button
+                    className="flex-1 gap-2"
+                    variant="outline"
+                    onClick={() => handleDownload(selected)}
+                    data-ocid="history.dialog_download.button"
+                  >
+                    <Download className="h-4 w-4" /> Download PDF
+                  </Button>
+                </div>
               </div>
             </>
           )}
