@@ -166,15 +166,15 @@ function buildInvoiceHtml(
       max-width: 210mm;
     }
     .outer-border { border: 2px solid #000; padding: 0; }
-    .header-section { padding: 4px 12px 3px; text-align: center; border-bottom: 1px solid #000; }
+    .header-section { padding: 6px 12px 5px; text-align: center; border-bottom: 1px solid #000; }
     .company-name {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
       letter-spacing: 1px;
       text-transform: uppercase;
-      margin-bottom: 1px;
+      margin-bottom: 2px;
     }
-    .company-sub { font-size: 9.5px; line-height: 1.3; }
+    .company-sub { font-size: 10px; line-height: 1.5; }
     .invoice-title {
       text-align: center;
       font-size: 13px;
