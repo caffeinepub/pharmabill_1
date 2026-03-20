@@ -317,6 +317,9 @@ function buildInvoiceHtml(
     </tbody>
   </table>
 
+  <div style="padding: 5px 12px; font-size: 10.5px; border-top: 1px solid #ccc; background: #fafafa;">
+    <strong>Amount in Words:</strong> ${amountInWords}
+  </div>
 
   <div class="bottom-section">
     <div class="terms-side">
