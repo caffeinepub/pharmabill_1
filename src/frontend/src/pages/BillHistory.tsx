@@ -116,6 +116,10 @@ function buildInvoiceHtml(
   const roundoff = grandTotalNum - (subtotalNum + totalGSTNum);
   const amountInWords = numberToWords(grandTotalNum);
 
+  // Build GST summary text
+  const baseTaxable = subtotalNum;
+  const gstSummary = `GST ${baseTaxable.toFixed(2)}*2.5+2.5%=${sgst.toFixed(2)}SGST+${cgst.toFixed(2)}CGST`;
+
   const itemRows = bill.items
     .map((item, idx) => {
       const med = medMap[String(item.medicineId)];
@@ -125,22 +129,21 @@ function buildInvoiceHtml(
       const halfGst = gstPct / 2;
       const amount = qty * mrp;
       const pack = getPackStr(med?.unit ?? "tablet");
-      const hsn = (med as any)?.hsnCode ?? "";
       const batch = (med as any)?.batchNumber ?? "";
       const expiry = (med as any)?.expiryDate ?? "";
       return `
         <tr>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${idx + 1}</td>
-          <td style="padding:3px 6px;border:1px solid #ccc">${med?.name ?? "Unknown"}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${pack}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${hsn}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${batch}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${expiry}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${qty}</td>
-          <td style="text-align:right;padding:3px 6px;border:1px solid #ccc">${mrp.toFixed(2)}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${halfGst.toFixed(2)}</td>
-          <td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${halfGst.toFixed(2)}</td>
-          <td style="text-align:right;padding:3px 6px;border:1px solid #ccc"><strong>${amount.toFixed(2)}</strong></td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${idx + 1}.</td>
+          <td style="padding:2px 5px;border:1px solid #bbb">${med?.name ?? "Unknown"}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${pack}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${batch}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${expiry}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${qty}</td>
+          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${mrp.toFixed(2)}</td>
+          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${mrp.toFixed(2)}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${halfGst.toFixed(2)}</td>
+          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${halfGst.toFixed(2)}</td>
+          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${amount.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
@@ -149,7 +152,7 @@ function buildInvoiceHtml(
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Tax Invoice - ${billNo(bill.billNumber)}</title>
+  <title>GST Invoice - ${billNo(bill.billNumber)}</title>
   <style>
     @media print {
       body { margin: 0; }
@@ -165,42 +168,14 @@ function buildInvoiceHtml(
       margin: 10px;
       max-width: 210mm;
     }
-    .outer-border { border: 2px solid #000; padding: 0; }
-    .header-section { padding: 6px 12px 5px; text-align: center; border-bottom: 1px solid #000; }
-    .company-name {
-      font-size: 20px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-    .company-sub { font-size: 10px; line-height: 1.5; }
-    .invoice-title {
-      text-align: center;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 3px;
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      padding: 2px;
-      background: #f0f0f0;
-    }
-    .bill-meta {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 12px;
-      border-bottom: 1px solid #000;
-      font-size: 10px;
-      line-height: 1.5;
-    }
-    .lbl { color: #444; }
+    .outer-border { border: 2px solid #000; }
     table.items {
       width: 100%;
       border-collapse: collapse;
       font-size: 10px;
     }
     table.items th {
-      background: #e0e0e0;
+      background: #c8e6c9;
       border: 1px solid #888;
       padding: 4px 3px;
       text-align: center;
@@ -208,169 +183,130 @@ function buildInvoiceHtml(
       font-size: 9.5px;
       white-space: nowrap;
     }
-    table.totals {
-      border-collapse: collapse;
-      min-width: 280px;
-    }
-    table.totals td {
-      padding: 3px 8px;
-      font-size: 11px;
-      border-bottom: 1px solid #eee;
-    }
+    table.totals { border-collapse: collapse; width: 100%; }
+    table.totals td { padding: 2px 8px; font-size: 11px; border-bottom: 1px solid #ddd; }
     table.totals tr.grand td {
-      font-size: 13px;
-      font-weight: bold;
-      background: #e0e0e0;
-      border-top: 2px solid #000;
-      padding: 5px 8px;
-    }
-    }
-    .bottom-section {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      padding: 8px 12px;
-      border-top: 1px solid #000;
-      font-size: 10px;
-    }
-    .terms-side {
-      flex: 1 1 55%;
-      max-width: 55%;
-      line-height: 1.8;
-    }
-    .remark-line {
-      margin-top: 8px;
-      font-size: 10px;
-    }
-    .sign-center {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      align-items: center;
-      min-width: 160px;
-      padding: 0 12px;
-    }
-    .totals-side { min-width: 280px; }
-    .grand-total-words-bar {
-      border-top: 1px solid #ccc;
-      border-bottom: 1px solid #ccc;
-      padding: 5px 12px;
-      font-size: 10.5px;
-      background: #fafafa;
-      text-align: right;
-    }
-    .get-well {
-      text-align: center;
-      font-weight: bold;
-      font-size: 12px;
-      letter-spacing: 2px;
-      border-top: 1px solid #000;
-      padding: 6px;
+      font-size: 12px; font-weight: bold;
+      background: #e0e0e0; border-top: 2px solid #000; padding: 4px 8px;
     }
   </style>
 </head>
 <body>
 <div class="outer-border">
 
-  <div class="header-section">
-    <div class="company-name">${profile.name}</div>
-    <div class="company-sub">
-      ${profile.address1}${profile.address2 ? `, ${profile.address2}` : ""}<br/>
-      Ph: ${profile.phone} &nbsp;|&nbsp; Email: ${profile.email}<br/>
-      GSTIN: ${profile.gstin} &nbsp;|&nbsp; D.L.No.: ${profile.dlNo1} / ${profile.dlNo2}
-    </div>
-  </div>
+  <!-- HEADER -->
+  <table style="width:100%;border-collapse:collapse;border-bottom:2px solid #000">
+    <tr>
+      <td style="width:50%;padding:6px 10px;vertical-align:top;border-right:1px solid #aaa">
+        <div><span style="color:#555;font-size:10px">Patient Name : </span><strong>${cust?.name ?? "Walk-in Customer"}</strong></div>
+        <div><span style="color:#555;font-size:10px">Patient PH. NO </span><span style="font-size:10px">${cust?.phone ?? "—"}</span></div>
+        <div><span style="color:#555;font-size:10px">Dr Name : </span><strong>${cust?.email ?? "—"}</strong></div>
+        <div><span style="color:#555;font-size:10px">Dr Reg No. </span><span style="font-size:10px">${cust?.address ?? "—"}</span></div>
+      </td>
+      <td style="width:50%;padding:6px 10px;vertical-align:top">
+        <div style="font-size:17px;font-weight:bold;color:#0a2a6e;text-transform:uppercase;letter-spacing:0.5px">${profile.name}</div>
+        <div style="color:#0a2a6e;font-size:10px;margin-top:1px">${profile.address1}${profile.address2 ? `, ${profile.address2}` : ""}</div>
+        <div style="color:#0a2a6e;font-size:10px">Phone : ${profile.phone}</div>
+        <div style="color:#0a2a6e;font-size:10px">E-Mail : ${profile.email}</div>
+      </td>
+    </tr>
+    <tr style="border-top:1px solid #aaa">
+      <td style="padding:4px 10px;vertical-align:middle;border-right:1px solid #aaa">
+        <div style="font-size:10px;color:#333">D.L.No. : <strong>${profile.dlNo1}/${profile.dlNo2}</strong></div>
+        <div style="font-size:10px;color:#333">GSTIN : <strong>${profile.gstin}</strong></div>
+      </td>
+      <td style="padding:0;vertical-align:middle">
+        <table style="width:100%;border-collapse:collapse">
+          <tr>
+            <td style="text-align:center;padding:4px 10px;border-right:1px solid #aaa">
+              <span style="font-size:16px;font-weight:bold;letter-spacing:2px">GST INVOICE</span>
+            </td>
+            <td style="padding:4px 10px;white-space:nowrap;font-size:10px">
+              <div>Invoice No. : &nbsp;<strong>${billNo(bill.billNumber)}</strong></div>
+              <div>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : &nbsp;<strong>${fmtDate(bill.billDate)}</strong></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 
-  <div class="invoice-title">GST INVOICE</div>
-
-  <div class="bill-meta">
-    <div class="bill-meta-left">
-      <div><span class="lbl">Patient Name : </span><strong>${cust?.name ?? "Walk-in Customer"}</strong></div>
-      <div><span class="lbl">Ph. No &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span>${cust?.phone ?? "—"}</div>
-      <div><span class="lbl">Doctor Name &nbsp;: </span><strong>${cust?.email ?? "—"}</strong></div>
-      <div><span class="lbl">Doctor Reg No: </span>${cust?.address ?? "—"}</div>
-    </div>
-    <div class="bill-meta-right" style="text-align:right">
-      <div><span class="lbl">Invoice No : </span><strong>${billNo(bill.billNumber)}</strong></div>
-      <div><span class="lbl">Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: </span><strong>${fmtDate(bill.billDate)}</strong></div>
-    </div>
-  </div>
-
+  <!-- ITEMS TABLE -->
   <table class="items">
     <thead>
       <tr>
-        <th style="width:28px">S.No</th>
-        <th style="width:160px">Product Name</th>
-        <th style="width:44px">Pack</th>
-        <th style="width:50px">HSN</th>
-        <th style="width:70px">Batch</th>
-        <th style="width:50px">Expiry</th>
-        <th style="width:30px">Qty</th>
-        <th style="width:62px">MRP</th>
-        <th style="width:44px">SGST%</th>
-        <th style="width:44px">CGST%</th>
+        <th style="width:26px">SN</th>
+        <th style="min-width:140px;text-align:left;padding-left:5px">PRODUCT NAME</th>
+        <th style="width:44px">PACK</th>
+        <th style="width:72px">BATCH</th>
+        <th style="width:46px">EXP.</th>
+        <th style="width:32px">QTY</th>
+        <th style="width:60px">MRP</th>
+        <th style="width:60px">RATE</th>
+        <th style="width:44px">SGST</th>
+        <th style="width:44px">CGST</th>
         <th style="width:68px">Amount</th>
       </tr>
     </thead>
     <tbody>
       ${itemRows}
+      <tr style="height:${Math.max(0, 12 - bill.items.length) * 18}px"><td colspan="11"></td></tr>
     </tbody>
   </table>
 
-  <div style="padding: 5px 12px; font-size: 10.5px; border-top: 1px solid #ccc; background: #fafafa;">
-    <strong>Amount in Words:</strong> ${amountInWords}
+  <!-- GST SUMMARY BAR -->
+  <div style="border-top:1px solid #888;border-bottom:1px solid #888;padding:3px 10px;font-size:9.5px;background:#f9f9f9">
+    ${gstSummary}
   </div>
 
-  <div class="bottom-section">
-    <div class="terms-side">
-      <div>
-        <strong>Terms &amp; Conditions:</strong><br/>
-        1. Goods once sold will not be taken back or exchanged.<br/>
-        2. Bills not paid due date will attract 24% interest.<br/>
-        3. All disputes subject to Jurisdication only.<br/>
-        4. Prescribed Sales Tax declaration will be given.
-      </div>
-      <div class="remark-line">
-        <strong>Remark :</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-      </div>
-    </div>
-    <div class="sign-center">
-      <div style="text-align:center">
-        <div style="font-weight:bold;font-size:11px;margin-bottom:40px">For ${profile.name}</div>
+  <!-- FOOTER SECTION -->
+  <table style="width:100%;border-collapse:collapse">
+    <tr>
+      <td style="width:55%;padding:8px 10px;vertical-align:top">
+        <div style="font-size:10px">
+          <strong><u>Terms &amp; Conditions</u></strong><br/>
+          Goods once sold will not be taken back or exchanged.<br/>
+          Bills not paid due date will attract 24% interest.<br/>
+          All disputes subject to Jurisdication only.<br/>
+          Prescribed Sales Tax declaration will be given.
+        </div>
+        <div style="margin-top:8px;font-size:10px"><strong>Remark :</strong></div>
+        <div style="margin-top:16px;font-size:10.5px"><strong>${amountInWords}</strong></div>
+      </td>
+      <td style="width:20%;padding:8px 10px;vertical-align:bottom;text-align:center;border-right:1px solid #aaa">
+        <div style="font-weight:bold;font-size:10.5px;margin-bottom:40px">For ${profile.name}</div>
         <div style="border-top:1px solid #000;padding-top:4px;font-size:10px;font-weight:bold">Authorised Signatory</div>
-      </div>
-    </div>
-    <div class="totals-side">
-      <table class="totals">
-        <tr>
-          <td>Sub Total</td>
-          <td style="text-align:right">₹${subtotalNum.toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>SGST 2.5%</td>
-          <td style="text-align:right">₹${sgst.toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>CGST 2.5%</td>
-          <td style="text-align:right">₹${cgst.toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>Roundoff</td>
-          <td style="text-align:right">${roundoff >= 0 ? "+" : ""}${roundoff.toFixed(2)}</td>
-        </tr>
-        <tr class="grand">
-          <td>Grand Total</td>
-          <td style="text-align:right">₹${grandTotalNum.toLocaleString("en-IN")}.00</td>
-        </tr>
-      </table>
-    </div>
-  </div>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:0">
+        <table class="totals">
+          <tr>
+            <td>Sub Total</td>
+            <td style="text-align:right">${subtotalNum.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>SGST</td>
+            <td style="text-align:right">${sgst.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>CGST</td>
+            <td style="text-align:right">${cgst.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td>Roundoff</td>
+            <td style="text-align:right">${roundoff >= 0 ? "+" : ""}${roundoff.toFixed(2)}</td>
+          </tr>
+          <tr class="grand">
+            <td>GRAND TOTAL</td>
+            <td style="text-align:right">${grandTotalNum.toLocaleString("en-IN")}.00</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 
-  <div class="grand-total-words-bar">
-    <strong>Grand Total in Words:</strong> ${amountInWords}
+  <div style="text-align:center;font-weight:bold;font-size:12px;letter-spacing:2px;border-top:2px solid #000;padding:5px">
+    *** Get Well Soon ***
   </div>
-
-  <div class="get-well">*** Get Well Soon ***</div>
 
 </div>
 </body>
