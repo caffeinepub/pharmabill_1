@@ -234,22 +234,36 @@ function buildInvoiceHtml(
     .bottom-section {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: flex-end;
       padding: 8px 12px;
       border-top: 1px solid #000;
       font-size: 10px;
     }
-    .terms-side { max-width: 55%; line-height: 1.7; }
-    .totals-side { min-width: 280px; }
-    .terms { line-height: 1.7; }
-    .sign-line {
-      border-top: 1px solid #000;
-      width: 150px;
-      margin-top: 30px;
-      text-align: center;
-      padding-top: 4px;
-      font-weight: bold;
+    .terms-side {
+      flex: 1 1 55%;
+      max-width: 55%;
+      line-height: 1.8;
+    }
+    .remark-line {
+      margin-top: 8px;
       font-size: 10px;
+    }
+    .sign-center {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      min-width: 160px;
+      padding: 0 12px;
+    }
+    .totals-side { min-width: 280px; }
+    .grand-total-words-bar {
+      border-top: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      padding: 5px 12px;
+      font-size: 10.5px;
+      background: #fafafa;
+      text-align: right;
     }
     .get-well {
       text-align: center;
@@ -315,13 +329,22 @@ function buildInvoiceHtml(
 
   <div class="bottom-section">
     <div class="terms-side">
-      <div class="terms">
+      <div>
         <strong>Terms &amp; Conditions:</strong><br/>
         1. Goods once sold will not be taken back or exchanged.<br/>
-        2. Subject to Delhi jurisdiction only.<br/>
-        3. All disputes subject to Delhi courts.
+        2. Bills not paid due date will attract 24% interest.<br/>
+        3. All disputes subject to Jurisdication only.<br/>
+        4. Prescribed Sales Tax declaration will be given.
       </div>
-      <div class="sign-line">Authorized Signatory</div>
+      <div class="remark-line">
+        <strong>Remark :</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      </div>
+    </div>
+    <div class="sign-center">
+      <div style="text-align:center">
+        <div style="font-weight:bold;font-size:11px;margin-bottom:40px">For ${profile.name}</div>
+        <div style="border-top:1px solid #000;padding-top:4px;font-size:10px;font-weight:bold">Authorised Signatory</div>
+      </div>
     </div>
     <div class="totals-side">
       <table class="totals">
@@ -347,6 +370,10 @@ function buildInvoiceHtml(
         </tr>
       </table>
     </div>
+  </div>
+
+  <div class="grand-total-words-bar">
+    <strong>Grand Total in Words:</strong> ${amountInWords}
   </div>
 
   <div class="get-well">*** Get Well Soon ***</div>
@@ -397,7 +424,6 @@ export default function BillHistory() {
     if (w) {
       w.document.write(html);
       w.document.close();
-      // Give browser time to render, then trigger print (save as PDF)
       setTimeout(() => {
         w.print();
       }, 600);

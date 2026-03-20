@@ -47,7 +47,7 @@ export function useGetDashboardStats() {
         throw err;
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 
@@ -69,7 +69,7 @@ export function useGetMedicines() {
         return getCache<Medicine[]>("medicines") ?? [];
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 
@@ -91,7 +91,7 @@ export function useGetCustomers() {
         return getCache<Customer[]>("customers") ?? [];
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 
@@ -113,7 +113,7 @@ export function useGetBills() {
         return getCache<Bill[]>("bills") ?? [];
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 
@@ -135,7 +135,7 @@ export function useGetDistributors() {
         return getCache<Distributor[]>("distributors") ?? [];
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 
@@ -157,7 +157,7 @@ export function useGetPurchases() {
         return getCache<Purchase[]>("purchases") ?? [];
       }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isOnline || (!!actor && !isFetching),
   });
 }
 

@@ -63,10 +63,10 @@ interface BillRow {
 }
 
 function calcRow(row: BillRow) {
-  const subtotal = row.qty * row.unitPrice;
-  const gstAmt = (subtotal * row.gstPct) / 100;
-  const total = subtotal + gstAmt;
-  return { subtotal, gstAmt, total };
+  const total = row.qty * row.unitPrice; // MRP × Qty, already GST-inclusive
+  const baseAmt = total / (1 + row.gstPct / 100); // pre-GST taxable amount
+  const gstAmt = total - baseAmt;
+  return { subtotal: baseAmt, gstAmt, total };
 }
 
 let rowCounter = 0;
@@ -1317,7 +1317,7 @@ export default function NewBill() {
             </CardHeader>
             <CardContent className="px-5 pb-4 space-y-2">
               <div className="flex justify-between text-[13px]">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">Taxable Amt</span>
                 <span>₹{totals.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[13px]">
