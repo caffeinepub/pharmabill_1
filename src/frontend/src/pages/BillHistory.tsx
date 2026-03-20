@@ -120,6 +120,11 @@ function buildInvoiceHtml(
   const baseTaxable = subtotalNum;
   const gstSummary = `GST ${baseTaxable.toFixed(2)}*2.5+2.5%=${sgst.toFixed(2)}SGST+${cgst.toFixed(2)}CGST`;
 
+  const patientName = cust?.name ?? "Walk-in Customer";
+  const patientPhone = cust?.phone ?? "—";
+  const doctorName = cust?.email ?? "—";
+  const doctorRegNo = cust?.address ?? "—";
+
   const itemRows = bill.items
     .map((item, idx) => {
       const med = medMap[String(item.medicineId)];
@@ -133,17 +138,17 @@ function buildInvoiceHtml(
       const expiry = (med as any)?.expiryDate ?? "";
       return `
         <tr>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${idx + 1}.</td>
-          <td style="padding:2px 5px;border:1px solid #bbb">${med?.name ?? "Unknown"}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${pack}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${batch}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${expiry}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${qty}</td>
-          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${mrp.toFixed(2)}</td>
-          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${mrp.toFixed(2)}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${halfGst.toFixed(2)}</td>
-          <td style="text-align:center;padding:2px 3px;border:1px solid #bbb">${halfGst.toFixed(2)}</td>
-          <td style="text-align:right;padding:2px 5px;border:1px solid #bbb">${amount.toFixed(2)}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${idx + 1}.</td>
+          <td style="padding:2px 5px;border-left:1px solid #bbb;border-right:1px solid #bbb">${med?.name ?? "Unknown"}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${pack}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${batch}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${expiry}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${qty}</td>
+          <td style="text-align:right;padding:2px 5px;border-left:1px solid #bbb;border-right:1px solid #bbb">${mrp.toFixed(2)}</td>
+          <td style="text-align:right;padding:2px 5px;border-left:1px solid #bbb;border-right:1px solid #bbb">${mrp.toFixed(2)}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${halfGst.toFixed(2)}</td>
+          <td style="text-align:center;padding:2px 3px;border-left:1px solid #bbb;border-right:1px solid #bbb">${halfGst.toFixed(2)}</td>
+          <td style="text-align:right;padding:2px 5px;border-left:1px solid #bbb;border-right:1px solid #bbb">${amount.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
@@ -194,39 +199,37 @@ function buildInvoiceHtml(
 <body>
 <div class="outer-border">
 
-  <!-- HEADER -->
-  <table style="width:100%;border-collapse:collapse;border-bottom:2px solid #000">
+  <!-- HEADER TOP ROW: Pharmacy info left | Patient info right (no vertical divider) -->
+  <table style="width:100%;border-collapse:collapse;border-bottom:1px solid #aaa">
     <tr>
-      <td style="width:50%;padding:6px 10px;vertical-align:top;border-right:1px solid #aaa">
-        <div><span style="color:#555;font-size:10px">Patient Name : </span><strong>${cust?.name ?? "Walk-in Customer"}</strong></div>
-        <div><span style="color:#555;font-size:10px">Patient PH. NO </span><span style="font-size:10px">${cust?.phone ?? "—"}</span></div>
-        <div><span style="color:#555;font-size:10px">Dr Name : </span><strong>${cust?.email ?? "—"}</strong></div>
-        <div><span style="color:#555;font-size:10px">Dr Reg No. </span><span style="font-size:10px">${cust?.address ?? "—"}</span></div>
-      </td>
       <td style="width:50%;padding:6px 10px;vertical-align:top">
         <div style="font-size:17px;font-weight:bold;color:#0a2a6e;text-transform:uppercase;letter-spacing:0.5px">${profile.name}</div>
-        <div style="color:#0a2a6e;font-size:10px;margin-top:1px">${profile.address1}${profile.address2 ? `, ${profile.address2}` : ""}</div>
-        <div style="color:#0a2a6e;font-size:10px">Phone : ${profile.phone}</div>
-        <div style="color:#0a2a6e;font-size:10px">E-Mail : ${profile.email}</div>
+        <div style="color:#0a2a6e;font-size:10px;margin-top:2px">${profile.address1}${profile.address2 ? `, ${profile.address2}` : ""}</div>
+        <div style="color:#0a2a6e;font-size:10px;margin-top:2px">Phone : ${profile.phone}</div>
+        <div style="color:#0a2a6e;font-size:10px;margin-top:2px">E-Mail : ${profile.email}</div>
+      </td>
+      <td style="width:50%;padding:6px 10px;vertical-align:top">
+        <div style="font-size:11px;font-weight:bold;margin-bottom:3px"><strong>Patient Name : ${patientName}</strong></div>
+        <div style="font-size:10.5px;margin-bottom:3px">Patient PH. NO &nbsp;${patientPhone}</div>
+        <div style="font-size:10.5px;margin-bottom:3px">Dr Name : ${doctorName}</div>
+        <div style="font-size:10.5px">Dr Reg No. ${doctorRegNo}</div>
       </td>
     </tr>
-    <tr style="border-top:1px solid #aaa">
-      <td style="padding:4px 10px;vertical-align:middle;border-right:1px solid #aaa">
+  </table>
+
+  <!-- HEADER SECOND ROW: DL/GSTIN | GST INVOICE (bold borders) | Bill No/Date -->
+  <table style="width:100%;border-collapse:collapse;border-bottom:2px solid #000">
+    <tr>
+      <td style="width:35%;padding:5px 10px;vertical-align:middle;border-right:2px solid #000">
         <div style="font-size:10px;color:#333">D.L.No. : <strong>${profile.dlNo1}/${profile.dlNo2}</strong></div>
         <div style="font-size:10px;color:#333">GSTIN : <strong>${profile.gstin}</strong></div>
       </td>
-      <td style="padding:0;vertical-align:middle">
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="text-align:center;padding:4px 10px;border-right:1px solid #aaa">
-              <span style="font-size:16px;font-weight:bold;letter-spacing:2px">GST INVOICE</span>
-            </td>
-            <td style="padding:4px 10px;white-space:nowrap;font-size:10px">
-              <div>Invoice No. : &nbsp;<strong>${billNo(bill.billNumber)}</strong></div>
-              <div>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : &nbsp;<strong>${fmtDate(bill.billDate)}</strong></div>
-            </td>
-          </tr>
-        </table>
+      <td style="width:30%;padding:5px 10px;vertical-align:middle;text-align:center;border-right:2px solid #000">
+        <span style="font-size:22px;font-weight:900;letter-spacing:2px;color:#000">GST INVOICE</span>
+      </td>
+      <td style="width:35%;padding:5px 10px;vertical-align:middle;font-size:10.5px">
+        <div style="margin-bottom:3px">BILL NO. &nbsp;: &nbsp;<strong>${billNo(bill.billNumber)}</strong></div>
+        <div>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;<strong>${fmtDate(bill.billDate)}</strong></div>
       </td>
     </tr>
   </table>
@@ -250,7 +253,7 @@ function buildInvoiceHtml(
     </thead>
     <tbody>
       ${itemRows}
-      <tr style="height:${Math.max(0, 12 - bill.items.length) * 18}px"><td colspan="11"></td></tr>
+      ${Array.from({ length: Math.max(0, 12 - bill.items.length) }, () => `<tr>${Array(11).fill('<td style="border-left:1px solid #bbb;border-right:1px solid #bbb;height:18px"></td>').join("")}</tr>`).join("")}
     </tbody>
   </table>
 
@@ -273,8 +276,8 @@ function buildInvoiceHtml(
         <div style="margin-top:8px;font-size:10px"><strong>Remark :</strong></div>
         <div style="margin-top:16px;font-size:10.5px"><strong>${amountInWords}</strong></div>
       </td>
-      <td style="width:20%;padding:8px 10px;vertical-align:bottom;text-align:center;border-right:1px solid #aaa">
-        <div style="font-weight:bold;font-size:10.5px;margin-bottom:40px">For ${profile.name}</div>
+      <td style="width:20%;padding:8px 4px 8px 2px;vertical-align:bottom;text-align:center;border-right:1px solid #aaa">
+        <div style="font-weight:bold;font-size:10.5px;margin-bottom:40px;white-space:nowrap">For ${profile.name}</div>
         <div style="border-top:1px solid #000;padding-top:4px;font-size:10px;font-weight:bold">Authorised Signatory</div>
       </td>
       <td style="width:25%;vertical-align:top;padding:0">
